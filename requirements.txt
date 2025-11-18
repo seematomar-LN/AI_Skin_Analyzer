@@ -1,7 +1,7 @@
 streamlit
-opencv
 opencv-python-headless
 numpy
 Pillow
 mediapipe
+
 
