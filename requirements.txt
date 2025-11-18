@@ -1,9 +1,5 @@
-streamlit==1.39.0
-opencv-python-headless==4.10.0.84
-numpy==2.1.2
-Pillow==10.4.0
-scikit-image==0.24.0
+streamlit
+opencv-python-headless
+numpy
+Pillow
 mediapipe
-torch 
-torchvision
-groq
