@@ -48,13 +48,14 @@ def get_landmarks(image_bgr: np.ndarray) -> Tuple[List[Tuple[int,int]], Tuple[in
         return pts, (h,w)
 
 def draw_landmarks_on_face(image_bgr: np.ndarray, landmarks: List[Tuple[int,int]], concern: str) -> np.ndarray:
-    """Draw colored overlay on face based on concern type - Minimalist style."""
-    img_with_overlay = image_bgr.copy()
-    h, w = img_with_overlay.shape[:2]
-    
-    # Create an overlay mask
-    overlay = np.zeros((h, w, 3), dtype=np.uint8)
-    
+    """Draw subtle transparent highlight on face based on concern type."""
+    img_with_highlight = image_bgr.copy().astype(np.float32)
+    h, w = img_with_highlight.shape[:2]
+
+    # Create highlight mask
+    highlight_mask = np.zeros((h, w), dtype=np.float32)
+    region_hulls = []
+
     # Define landmark groups for different concerns
     concern_landmarks = {
         'Dark Circles': {
@@ -66,72 +67,90 @@ def draw_landmarks_on_face(image_bgr: np.ndarray, landmarks: List[Tuple[int,int]
             'cheeks': [50, 101, 36, 205, 206, 280, 330, 266, 425, 426]
         },
         'Pigmentation': {
-            'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
-            'cheeks': [50, 187, 207, 216, 212, 202, 204, 194, 135, 138, 215, 213, 192, 177, 137, 123, 116, 117, 118, 101, 119, 120, 121, 128, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152, 280, 411, 427, 436, 432, 422, 424, 418, 364, 367, 435, 433, 416, 401, 366, 352, 345, 346, 347, 330, 348, 349, 350, 357, 465, 464, 463, 359, 249, 390, 373, 374, 380, 381, 382]
+            'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288],
+            'cheeks': [50, 187, 207, 216, 212, 202, 280, 411, 427, 436, 432, 422]
         },
         'Acne': {
-            'tzone': [1, 2, 98, 327, 168, 6, 197, 195, 5, 4, 51, 281, 48, 278, 45, 275, 10, 338, 297, 332, 284],
-            'cheeks': [50, 101, 36, 205, 206, 207, 216, 212, 202, 204, 194, 135, 138, 215, 213, 192, 177, 137, 123, 116, 117, 118, 119, 120, 121, 128, 234, 93, 132, 58, 172, 280, 330, 266, 425, 426, 427, 436, 432, 422, 424, 418, 364, 367, 435, 433, 416, 401, 366, 352, 345, 346, 347, 348, 349, 350, 357]
+            'tzone': [1, 2, 98, 327, 168, 6, 197, 195, 5, 4, 51, 281, 48, 278],
+            'cheeks': [50, 101, 36, 205, 206, 207, 216, 280, 330, 266, 425, 426, 427, 436]
         },
         'Redness': {
-            'central': [1, 2, 98, 327, 168, 6, 197, 195, 5, 4, 51, 281, 48, 278, 45, 275, 50, 101, 118, 101, 50, 205, 206, 280, 330, 425, 426]
+            'central': [1, 2, 98, 327, 168, 6, 50, 101, 118, 205, 206, 280, 330, 425, 426]
         },
         'Lines': {
-            'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
-            'eyes': [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246, 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+            'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288],
+            'eyes': [33, 7, 163, 144, 145, 153, 154, 155, 362, 382, 381, 380, 374, 373]
         },
         'Texture': {
-            'all_face': list(range(0, 468, 8))
+            'face': [10, 338, 297, 332, 50, 280, 187, 411, 101, 330, 234, 454]
         },
         'Hydration': {
-            'all_face': list(range(0, 468, 10))
+            'face': [10, 338, 297, 332, 50, 280, 187, 411, 101, 330, 234, 454, 152, 377]
         },
         'Uniformness': {
-            'cheeks': [50, 187, 207, 216, 212, 202, 204, 194, 135, 138, 215, 213, 192, 177, 137, 123, 116, 117, 118, 101, 119, 120, 121, 128, 234, 93, 132, 280, 411, 427, 436, 432, 422, 424, 418, 364, 367, 435, 433, 416, 401, 366, 352, 345, 346, 347, 330, 348, 349, 350, 357]
+            'cheeks': [50, 187, 207, 216, 212, 202, 280, 411, 427, 436, 432, 422, 101, 330]
         },
         'Skin Tone': {
-            'all_face': list(range(0, 468, 15))
+            'face': [10, 338, 297, 332, 50, 280, 187, 411, 101, 330, 234, 454, 152, 377]
         }
     }
     
-    # Color scheme (semi-transparent)
+    # Color scheme (BGR format) - softer colors
     concern_colors = {
-        'Dark Circles': (220, 100, 180),  # Purple
-        'Pores': (200, 200, 40),  # Yellow/Cyan
-        'Pigmentation': (200, 120, 20),  # Orange/Brown
-        'Acne': (220, 60, 20),  # Red
-        'Redness': (200, 40, 0),  # Deep Red
-        'Lines': (160, 160, 160),  # Gray
-        'Texture': (60, 160, 200),  # Blue
-        'Hydration': (180, 200, 255),  # Light Blue
-        'Uniformness': (200, 170, 80),  # Yellow
-        'Skin Tone': (220, 150, 20)  # Golden
+        'Dark Circles': (180, 100, 220),  # Light Purple
+        'Pores': (100, 200, 200),  # Light Cyan
+        'Pigmentation': (100, 180, 255),  # Light Orange
+        'Acne': (100, 100, 255),  # Light Red
+        'Redness': (100, 120, 255),  # Soft Red
+        'Lines': (200, 200, 200),  # Light Gray
+        'Texture': (200, 180, 100),  # Light Blue
+        'Hydration': (255, 220, 180),  # Very Light Blue
+        'Uniformness': (150, 200, 255),  # Light Yellow
+        'Skin Tone': (150, 200, 250)  # Light Golden
     }
     
-    color = concern_colors.get(concern, (0, 255, 0))
-    landmark_groups = concern_landmarks.get(concern, {'default': list(range(0, 468, 10))})
-    
-    # Draw filled polygons for each region
+    color = concern_colors.get(concern, (100, 255, 100))
+    landmark_groups = concern_landmarks.get(concern, {'default': [10, 50, 280, 187, 411]})
+    # Draw filled polygons on mask and keep hulls for dotted outlines
     for region_name, indices in landmark_groups.items():
         if len(indices) >= 3:
             points = []
             for idx in indices:
                 if idx < len(landmarks):
                     points.append(landmarks[idx])
-            
+
             if len(points) >= 3:
-                # Create convex hull for the region
                 points_array = np.array(points, dtype=np.int32)
                 hull = cv2.convexHull(points_array)
-                
-                # Fill the polygon on overlay
-                cv2.fillConvexPoly(overlay, hull, color)
+                cv2.fillConvexPoly(highlight_mask, hull, 1.0)
+                region_hulls.append(hull)
     
-    # Blend overlay with original image (40% opacity)
-    alpha = 0.4
-    img_with_overlay = cv2.addWeighted(img_with_overlay, 1 - alpha, overlay, alpha, 0)
+    # Apply strong Gaussian blur for soft glow effect
+    kernel_size = max(51, int(0.1 * max(h, w)))
+    if kernel_size % 2 == 0:
+        kernel_size += 1
+    highlight_mask = cv2.GaussianBlur(highlight_mask, (kernel_size, kernel_size), 0)
     
-    return img_with_overlay
+    # NOTE: User requested no large shaded fill — only highlight markers.
+    # So we skip the translucent colored fill and keep the original image as base.
+    result = np.clip(img_with_highlight, 0, 255).astype(np.uint8)
+    
+    # --- Minimal single-color highlighting (no lines, no dots) ---
+    # The user requested only a single-color highlight that follows the region shape.
+    # Use a single neutral highlight color (BGR). Adjust this color to taste.
+    HIGHLIGHT_BGR = (80, 150, 255)
+
+    # Create colored highlight using the (already) blurred mask
+    highlight = np.zeros_like(img_with_highlight)
+    highlight[:, :, 0] = HIGHLIGHT_BGR[0] * highlight_mask  # B
+    highlight[:, :, 1] = HIGHLIGHT_BGR[1] * highlight_mask  # G
+    highlight[:, :, 2] = HIGHLIGHT_BGR[2] * highlight_mask  # R
+
+    # Blend the highlight softly over the image; no outlines or dots
+    alpha = 0.28
+    result = cv2.addWeighted(result, 1.0, highlight.astype(np.uint8), alpha, 0)
+
+    return result
 
 # -------------------------
 # MASKS
@@ -808,12 +827,12 @@ if img_bgr is not None:
         
         with col_a:
             st.markdown("**Original Image**")
-            st.image(to_rgb(face_bgr_display), use_container_width =True)
+            st.image(to_rgb(face_bgr_display), use_container_width=True)
         
         with col_b:
             st.markdown(f"**{selected_concern} Highlighted**")
             face_highlighted = draw_landmarks_on_face(face_bgr_display, lm_local, selected_concern)
-            st.image(to_rgb(face_highlighted), use_container_width =True)
+            st.image(to_rgb(face_highlighted), use_container_width=True)
             
             # Show severity
             concern_score = scores[selected_concern]
@@ -870,5 +889,3 @@ if img_bgr is not None:
                     st.write("")
                 
                 st.markdown("---")
-
-    
