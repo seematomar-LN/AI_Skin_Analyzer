@@ -763,7 +763,7 @@ if img_bgr is not None:
         
         # Draw landmarks on top concern
         face_with_dots = draw_landmarks_on_face(face_bgr_display, lm_local, top2[0][0])
-        st.image(to_rgb(face_with_dots), use_column_width=True)
+        st.image(to_rgb(face_with_dots), use_container_width=True)
 
     with col2:
         st.subheader("🎯 Primary Concern")
@@ -808,12 +808,12 @@ if img_bgr is not None:
         
         with col_a:
             st.markdown("**Original Image**")
-            st.image(to_rgb(face_bgr_display), use_column_width=True)
+            st.image(to_rgb(face_bgr_display), use_container_width =True)
         
         with col_b:
             st.markdown(f"**{selected_concern} Highlighted**")
             face_highlighted = draw_landmarks_on_face(face_bgr_display, lm_local, selected_concern)
-            st.image(to_rgb(face_highlighted), use_column_width=True)
+            st.image(to_rgb(face_highlighted), use_container_width =True)
             
             # Show severity
             concern_score = scores[selected_concern]
@@ -870,4 +870,5 @@ if img_bgr is not None:
                     st.write("")
                 
                 st.markdown("---")
+
     
